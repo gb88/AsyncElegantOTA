@@ -24,7 +24,7 @@
 #include "FS.h"
 
 #include "elegantWebpage.h"
-
+#include "DigitalSignatureVerifier.h"
 
 class AsyncElegantOtaClass{
 
@@ -33,6 +33,7 @@ class AsyncElegantOtaClass{
             setID(const char* id),
             begin(AsyncWebServer *server, const char* username = "", const char* password = ""),
             loop(),
+			setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier),
             restart();
 
     private:
@@ -44,7 +45,13 @@ class AsyncElegantOtaClass{
         String _username = "";
         String _password = "";
         bool _authRequired = false;
-
+		uint8_t * _updateData;
+		size_t _updateDataLen;
+		size_t _sig_len;
+		uint8_t * signature;
+		bool verify;
+		UpdaterHashClass* _hash;
+		DigitalSignatureVerifier* _verifier; 
 };
 
 extern AsyncElegantOtaClass AsyncElegantOTA;

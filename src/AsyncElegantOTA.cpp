@@ -6,6 +6,13 @@ void AsyncElegantOtaClass::setID(const char* id){
     _id = id;
 }
 
+void AsyncElegantOtaClass::setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier)
+{
+	_hash = hash;
+	_verifier = verifier;
+	verify = true;
+}
+
 void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, const char* password){
     _server = server;
 
@@ -65,10 +72,17 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
         }
 
         if (!index) {
-            if(!request->hasParam("MD5", true)) {
-                return request->send(400, "text/plain", "MD5 parameter missing");
-            }            
-
+			if(!verify)
+			{
+				if(!request->hasParam("MD5", true)) {
+					return request->send(400, "text/plain", "MD5 parameter missing");
+				} 
+			}				
+			if(verify)
+            {
+                _sig_len = 0;
+                _hash->begin();
+            }
             #if defined(ESP8266)
                 int cmd = (filename == "filesystem") ? U_FS : U_FLASH;
                 Update.runAsync(true);
@@ -82,26 +96,89 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
                 Update.printError(Serial);
                 return request->send(400, "text/plain", "OTA could not begin");
             }
-            if(!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
-                return request->send(400, "text/plain", "MD5 parameter invalid");
-            }
+			if(!verify)
+			{
+				if(!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
+					return request->send(400, "text/plain", "MD5 parameter invalid");
+				}
+			}
+			
         }
 
         // Write chunked data to the free sketch space
-        if(len){
-            if (Update.write(data, len) != len) {
-                return request->send(400, "text/plain", "OTA could not begin");
-            }
+        if(len)
+		{
+			_updateData = data;
+			_updateDataLen = len;
+			if(verify)
+			{
+				if (_sig_len < _verifier->getSigLen())
+				{
+					if (_updateDataLen >= (_verifier->getSigLen() - _sig_len))
+					{
+						memcpy(&_verifier->signature[_sig_len], data, _verifier->getSigLen() - _sig_len);
+						_updateDataLen = _updateDataLen - (_verifier->getSigLen() - _sig_len);
+						_updateData = &data[_verifier->getSigLen() - _sig_len];
+						_sig_len += (_verifier->getSigLen() - _sig_len);
+					}
+					else
+					{
+						memcpy(&_verifier->signature[_sig_len], data, _updateDataLen);
+						_sig_len += _updateDataLen;
+						_updateDataLen = 0;
+						_updateData = NULL;
+					} 
+				}
+			}
+			if (_updateDataLen > 0)
+			{	
+				
+				if (Update.write(_updateData, _updateDataLen) != _updateDataLen) {
+					Update.printError(Serial);
+					return request->send(400, "text/plain", "OTA could not begin213");
+				}
+				if(verify)
+				{
+					_hash->add(_updateData, _updateDataLen);
+				}
+			}	
         }
             
-        if (final) { // if the final flag is set then this is the last frame of data
-            if (!Update.end(true)) { //true to set the size to the current progress
+        if (final) 
+		{ // if the final flag is set then this is the last frame of data
+            
+			if(verify)
+			{
+				bool signature_verification = true;
+				_hash->end();
+				signature_verification = _verifier->verify(_hash, _verifier->signature, _verifier->getSigLen());
+				if (!signature_verification)
+				{
+					if (!Update.end(true)) 
+					{ 
+						Update.printError(Serial);
+						return request->send(400, "text/plain", "Could not end OTA");
+					} 
+					else 
+					{
+						return;
+					}
+				}
+				else
+				{
+					Update.abort();
+					return request->send(500, "text/plain", "Signature Error");
+				}
+			}
+			else if (!Update.end(true)) 
+			{ //true to set the size to the current progress
                 Update.printError(Serial);
                 return request->send(400, "text/plain", "Could not end OTA");
             }
-        }else{
-            return;
-        }
+			else{
+				return;
+			}
+		}
     });
 }
 
@@ -126,3 +203,4 @@ String AsyncElegantOtaClass::getID(){
     id.toUpperCase();
     return id;
 }
+

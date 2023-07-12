@@ -6,6 +6,11 @@ void AsyncElegantOtaClass::setID(const char* id){
     _id = id;
 }
 
+void AsyncElegantOtaClass::setPage(const uint8_t * page, size_t len){
+	_page = page;
+	_page_len = len;
+}
+
 void AsyncElegantOtaClass::setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier)
 {
 	_hash = hash;
@@ -15,6 +20,8 @@ void AsyncElegantOtaClass::setDigitalSignature(UpdaterHashClass* hash, DigitalSi
 
 void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, const char* password){
     _server = server;
+	_page = ELEGANT_HTML;
+	_page_len = ELEGANT_HTML_SIZE;
 
     if(strlen(username) > 0){
         _authRequired = true;
@@ -45,7 +52,7 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
                 return request->requestAuthentication();
             }
         }
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", ELEGANT_HTML, ELEGANT_HTML_SIZE);
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", _page, _page_len);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });

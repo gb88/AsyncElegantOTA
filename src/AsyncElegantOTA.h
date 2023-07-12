@@ -31,6 +31,7 @@ class AsyncElegantOtaClass{
     public:
         void
             setID(const char* id),
+			setPage(const uint8_t * page, size_t len),
             begin(AsyncWebServer *server, const char* username = "", const char* password = ""),
             loop(),
 			setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier),
@@ -50,6 +51,8 @@ class AsyncElegantOtaClass{
 		size_t _sig_len;
 		uint8_t * signature;
 		bool verify;
+		size_t _page_len;
+		const uint8_t * _page;
 		UpdaterHashClass* _hash;
 		DigitalSignatureVerifier* _verifier; 
 };

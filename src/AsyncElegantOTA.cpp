@@ -90,6 +90,7 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
                 _sig_len = 0;
                 _hash->begin();
             }
+			if (_preUpdateRequired) preUpdateCallback();
             #if defined(ESP8266)
                 int cmd = (filename == "filesystem") ? U_FS : U_FLASH;
                 Update.runAsync(true);
@@ -117,6 +118,7 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
 		{
 			_updateData = data;
 			_updateDataLen = len;
+			if (_progressUpdateRequired) progressUpdateCallback();
 			if(verify)
 			{
 				if (_sig_len < _verifier->getSigLen())
@@ -164,25 +166,30 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
 					if (!Update.end(true)) 
 					{ 
 						Update.printError(Serial);
+						if (_postUpdateRequired) postUpdateCallback();
 						return request->send(400, "text/plain", "Could not end OTA");
 					} 
 					else 
 					{
+						if (_postUpdateRequired) postUpdateCallback();
 						return;
 					}
 				}
 				else
 				{
 					Update.abort();
+					if (_postUpdateRequired) postUpdateCallback();
 					return request->send(500, "text/plain", "Signature Error");
 				}
 			}
 			else if (!Update.end(true)) 
 			{ //true to set the size to the current progress
                 Update.printError(Serial);
+				if (_postUpdateRequired) postUpdateCallback();
                 return request->send(400, "text/plain", "Could not end OTA");
             }
 			else{
+				if (_postUpdateRequired) postUpdateCallback();
 				return;
 			}
 		}
@@ -211,3 +218,17 @@ String AsyncElegantOtaClass::getID(){
     return id;
 }
 
+void AsyncElegantOtaClass::onOTAStart(void callable(void)){
+    preUpdateCallback = callable;
+    _preUpdateRequired = true ;
+}
+
+void AsyncElegantOtaClass::onOTAProgress(void callable(void)){
+    progressUpdateCallback= callable;
+    _progressUpdateRequired = true ;
+}
+
+void AsyncElegantOtaClass::onOTAEnd(void callable(void)){
+    postUpdateCallback = callable;
+    _postUpdateRequired = true ;
+}

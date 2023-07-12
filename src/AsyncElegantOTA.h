@@ -55,6 +55,12 @@ class AsyncElegantOtaClass{
 		const uint8_t * _page;
 		UpdaterHashClass* _hash;
 		DigitalSignatureVerifier* _verifier; 
+		bool _preUpdateRequired = false;
+		bool _progressUpdateRequired = false;
+		bool _postUpdateRequired = false;
+		void (*preUpdateCallback)();
+		void (*progressUpdateCallback)();
+		void (*postUpdateCallback)();
 };
 
 extern AsyncElegantOtaClass AsyncElegantOTA;

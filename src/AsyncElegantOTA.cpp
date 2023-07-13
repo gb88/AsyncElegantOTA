@@ -7,8 +7,8 @@ void AsyncElegantOtaClass::setID(const char* id){
 }
 
 void AsyncElegantOtaClass::setPage(const uint8_t * page, size_t len){
-	//_page = page;
-	//_page_len = len;
+	_page = page;
+	_page_len = len;
 }
 
 void AsyncElegantOtaClass::setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier)

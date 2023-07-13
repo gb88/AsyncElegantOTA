@@ -31,6 +31,9 @@ class AsyncElegantOtaClass{
     public:
         void
             setID(const char* id),
+			onOTAStart(void callable(void)),
+			onOTAProgress(void callable(void)),
+			onOTAEnd(void callable(void)),
 			setPage(const uint8_t * page, size_t len),
             begin(AsyncWebServer *server, const char* username = "", const char* password = ""),
             loop(),
@@ -53,6 +56,7 @@ class AsyncElegantOtaClass{
 		bool verify;
 		size_t _page_len;
 		const uint8_t * _page;
+		int _error;
 		UpdaterHashClass* _hash;
 		DigitalSignatureVerifier* _verifier; 
 		bool _preUpdateRequired = false;

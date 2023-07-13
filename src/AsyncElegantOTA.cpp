@@ -7,8 +7,8 @@ void AsyncElegantOtaClass::setID(const char* id){
 }
 
 void AsyncElegantOtaClass::setPage(const uint8_t * page, size_t len){
-	_page = page;
-	_page_len = len;
+	//_page = page;
+	//_page_len = len;
 }
 
 void AsyncElegantOtaClass::setDigitalSignature(UpdaterHashClass* hash, DigitalSignatureVerifier* verifier)
@@ -69,7 +69,8 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
         response->addHeader("Connection", "close");
         response->addHeader("Access-Control-Allow-Origin", "*");
         request->send(response);
-        restart();
+		if(_error==0)
+			restart();
     }, [&](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
         //Upload handler chunks in data
         if(_authRequired){
@@ -79,10 +80,11 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
         }
 
         if (!index) {
+			_error = 0;
 			if(!verify)
 			{
 				if(!request->hasParam("MD5", true)) {
-					return request->send(400, "text/plain", "MD5 parameter missing");
+					_error = 1;
 				} 
 			}				
 			if(verify)
@@ -101,16 +103,15 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
                 int cmd = (filename == "filesystem") ? U_SPIFFS : U_FLASH;
                 if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd)) { // Start with max available size
             #endif
-                Update.printError(Serial);
-                return request->send(400, "text/plain", "OTA could not begin");
-            }
+					Update.printError(Serial);
+					_error = 2;
+				}
 			if(!verify)
 			{
 				if(!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
-					return request->send(400, "text/plain", "MD5 parameter invalid");
+					_error = 2;
 				}
 			}
-			
         }
 
         // Write chunked data to the free sketch space
@@ -141,10 +142,11 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
 			}
 			if (_updateDataLen > 0)
 			{	
-				
-				if (Update.write(_updateData, _updateDataLen) != _updateDataLen) {
-					Update.printError(Serial);
-					return request->send(400, "text/plain", "OTA could not begin213");
+				if(!Update.hasError()){
+					if (Update.write(_updateData, _updateDataLen) != _updateDataLen) {
+						//Update.printError(Serial);
+						_error = 3;
+					}
 				}
 				if(verify)
 				{
@@ -167,31 +169,43 @@ void AsyncElegantOtaClass::begin(AsyncWebServer *server, const char* username, c
 					{ 
 						Update.printError(Serial);
 						if (_postUpdateRequired) postUpdateCallback();
-						return request->send(400, "text/plain", "Could not end OTA");
+						_error = 4;
 					} 
 					else 
 					{
 						if (_postUpdateRequired) postUpdateCallback();
-						return;
 					}
 				}
 				else
 				{
-					Update.abort();
+					//Update.abort();
 					if (_postUpdateRequired) postUpdateCallback();
-					return request->send(500, "text/plain", "Signature Error");
+					_error = 5;
 				}
 			}
 			else if (!Update.end(true)) 
 			{ //true to set the size to the current progress
                 Update.printError(Serial);
 				if (_postUpdateRequired) postUpdateCallback();
-                return request->send(400, "text/plain", "Could not end OTA");
+				_error = 4;
             }
 			else{
 				if (_postUpdateRequired) postUpdateCallback();
-				return;
 			}
+			if(_error != 0)
+				Update.abort();
+			if(_error == 1)
+				return request->send(400, "text/plain", "MD5 parameter missing");
+			else if(_error == 2)
+				return request->send(400, "text/plain", "MD5 parameter invalid");
+			else if(_error == 3)
+				return request->send(400, "text/plain", "OTA could not begin");
+			else if(_error == 4)
+				return request->send(400, "text/plain", "Could not end OTA");
+			else if(_error == 5)
+				return request->send(500, "text/plain", "Signature _error");
+			else 
+				return;
 		}
     });
 }
